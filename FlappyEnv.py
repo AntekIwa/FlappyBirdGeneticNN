@@ -2,11 +2,9 @@ import pygame
 import random
 import numpy as np
 
-# --- Ustawienia gry ---
+# --- Game settings ---
 WIDTH, HEIGHT = 400, 600
 PIPE_WIDTH = 60
-PIPE_GAP = 150
-PIPE_DISTANCE = 200
 GRAVITY = 0.5
 JUMP_STRENGTH = -8
 FPS = 60
@@ -43,24 +41,30 @@ class Pipe:
     def __init__(self, x):
         self.x = x
         self.height = random.randint(100, HEIGHT - 200)
+        self.pipe_gap = random.randint(100, 300)
 
     def update(self):
         self.x -= 3
 
     def get_top_bottom(self):
-        return self.height, self.height + PIPE_GAP
+        return self.height, self.height + self.pipe_gap
 
     def collides_with(self, bird: Bird):
         rect = bird.get_rect()
-        top_rect = pygame.Rect(self.x, 0, PIPE_WIDTH, self.height)
-        bottom_rect = pygame.Rect(self.x, self.height + PIPE_GAP, PIPE_WIDTH, HEIGHT)
+        top, bottom = self.get_top_bottom()
+        top_rect = pygame.Rect(self.x, 0, PIPE_WIDTH, top)
+        bottom_rect = pygame.Rect(self.x, bottom, PIPE_WIDTH, HEIGHT)
         return rect.colliderect(top_rect) or rect.colliderect(bottom_rect)
 
 class FlappyEnvPopulation:
-    def __init__(self, networks, render=False, gen = 0):
+    def __init__(self, networks, render=False, gen=0):
         self.networks = networks
         self.birds = [Bird(net) for net in networks]
-        self.pipes = [Pipe(x) for x in range(400, 400 + 3 * PIPE_DISTANCE, PIPE_DISTANCE)]
+        self.pipes = []
+        x = 400
+        for _ in range(3):
+            self.pipes.append(Pipe(x))
+            x += random.randint(180, 260)
         self.frame = 0
         self.render = render
         self.gen = gen
@@ -80,15 +84,15 @@ class FlappyEnvPopulation:
     def step(self):
         if self.render:
             self.clock.tick(FPS)
-            self.win.fill((0, 0, 0))  # niebieskie tło
+            self.win.fill((0, 0, 0))
 
-        # Update rur
         for pipe in self.pipes:
             pipe.update()
 
-        if self.pipes[0].x < -PIPE_WIDTH:
+        if self.pipes[0].x < -PIPE_WIDTH: #old pipe go out of screen, lets generate new one
             self.pipes.pop(0)
-            self.pipes.append(Pipe(self.pipes[-1].x + PIPE_DISTANCE))
+            next_distance = random.randint(150, 300)
+            self.pipes.append(Pipe(self.pipes[-1].x + next_distance))
 
         all_dead = True
 
@@ -99,9 +103,10 @@ class FlappyEnvPopulation:
             all_dead = False
             bird.update()
 
-            # Wejścia do sieci
             pipe = self.get_next_pipe(bird)
             top, bottom = pipe.get_top_bottom()
+            #INPUTS for our NN are: birs.y posision, birds velocity, distance on x-axis to pipe, pitagoras distance to top of gap and to bottom of gap,
+            #distance to bottom and top of gapp (in y-axis), top and bottom of gap
             inputs = np.array([
                 bird.y / HEIGHT,
                 bird.velocity / 10.0,
@@ -115,15 +120,13 @@ class FlappyEnvPopulation:
             ])
 
             output = bird.network.propagate(inputs)
-            if output[0] > 0.5:
+            if output[0] > 0.5: #checking if our NN decide to jump
                 bird.jump()
 
-            # Kolizja
-            if pipe.collides_with(bird) or bird.y < 0 or bird.y > HEIGHT:
+            if pipe.collides_with(bird) or bird.y < 0 or bird.y > HEIGHT: #checking if bird went into pipe or exit board
                 bird.alive = False
 
-            # Wynik
-            if pipe.x + PIPE_WIDTH < bird.x and not hasattr(pipe, 'scored'):
+            if pipe.x + PIPE_WIDTH < bird.x and not hasattr(pipe, 'scored'): #checking if bird pass the obstacle
                 pipe.scored = True
                 bird.score += 1
 
@@ -132,10 +135,15 @@ class FlappyEnvPopulation:
 
         if self.render:
             for pipe in self.pipes:
+                #showing pipes
                 pygame.draw.rect(self.win, (0, 255, 0), (pipe.x, 0, PIPE_WIDTH, pipe.height))
                 pygame.draw.rect(self.win, (0, 255, 0),
-                                 (pipe.x, pipe.height + PIPE_GAP, PIPE_WIDTH, HEIGHT))
+                                 (pipe.x, pipe.height + pipe.pipe_gap, PIPE_WIDTH, HEIGHT))
 
+                # showing acutal gap size
+                gap_text = self.font.render(str(pipe.pipe_gap), True, (255, 255, 0))
+                self.win.blit(gap_text, (pipe.x + 5, pipe.height + pipe.pipe_gap // 2 - 10))
+                
             alive_count = sum(1 for b in self.birds if b.alive)
             text = self.font.render(f"Alive: {alive_count}", True, (255,255,255))
             self.win.blit(text, (WIDTH - 130, 10))
@@ -146,10 +154,9 @@ class FlappyEnvPopulation:
         self.frame += 1
         return all_dead
 
-    def run(self, max_frames=1000):
+    def run(self, max_frames=1000): #to not play for infinity, lets set max score
         while self.frame < max_frames:
             if self.step():
                 break
 
-        # Zwróć fitnessy (punktacja + życie)
-        return [b.score * 1000 + b.frames_alive for b in self.birds]
+        return [b.score * 1000 + b.frames_alive for b in self.birds] #score for bird(NN)
