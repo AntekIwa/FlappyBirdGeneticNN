@@ -9,19 +9,21 @@ OUTPUT_SIZE = 1
 
 POPULATION_SIZE = 100
 GENERATIONS = 250
-
+# NN which we are training has 3 layers: input (9 neurons), then identity layer (10 neurons) then ouput layer with 1 sigmoid neuron
 template_net = NeuralNetwork(
     layers_sizes=[INPUT_SIZE, HIDDEN_SIZE, OUTPUT_SIZE],
     activations=["identity","sigmoid"],
     loss_name="mse"
 )
 
+#we are seting our enviroment to traing network (template_net) with given population_size, mutation_rate and elite_fraction
 trainer = GeneticTrainer(
     network=template_net,
     population_size=POPULATION_SIZE,
     mutation_rate=0.05,
     elite_fraction=0.2
 )
+
 
 for g in range(GENERATIONS):
     print(f"\n=== Generacja {g+1}/{GENERATIONS} ===")
