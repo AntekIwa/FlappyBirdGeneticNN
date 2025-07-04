@@ -1,6 +1,6 @@
 import numpy as np
 
-class ActivationFunction:
+class ActivationFunction: #some activation functions
     @staticmethod
     def sigmoid(x):
         return 1 / (1 + np.exp(-x))
@@ -11,7 +11,7 @@ class ActivationFunction:
     
     @staticmethod
     def softmax(x):
-        e_x = np.exp(x - np.max(x))  # stabilizacja
+        e_x = np.exp(x - np.max(x))  
         return e_x / np.sum(e_x)
     @staticmethod
     def identity(x):
@@ -25,7 +25,7 @@ ACTIVATIONS = {
 }
 
 
-class CostFunction:
+class CostFunction: #some cost functions
     @staticmethod
     def mse(y_pred, y_true):
         return np.mean((y_pred - y_true) ** 2)
@@ -42,14 +42,14 @@ COSTS = {
 
 class NeuralNetwork:
     def __init__(self, layers_sizes, activations, loss_name):
-        self.weights = [np.random.randn(y, x) for x, y in zip(layers_sizes[:-1], layers_sizes[1:])]
+        self.weights = [np.random.randn(y, x) for x, y in zip(layers_sizes[:-1], layers_sizes[1:])] #generating random weights and biases
         self.biases = [np.random.randn(y) for y in layers_sizes[1:]]
 
         self.activations = [ACTIVATIONS[name] for name in activations]
 
         self.loss_function = COSTS[loss_name]
 
-    def propagate(self, x):
+    def propagate(self, x): # propageting previously chosen activation funciton for each layer
         for w, b, act in zip(self.weights, self.biases, self.activations):
                 x = act(np.dot(w, x) + b)
         return x
